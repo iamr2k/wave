@@ -1,6 +1,6 @@
 {
-    "name": "Bluetooth Messenger",
-    "short_name": "BT Messenger",
+    "name": "Wave",
+    "short_name": "Wave",
     "start_url": "/index.html",
     "display": "standalone",
     "background_color": "#ffffff",

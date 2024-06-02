@@ -1,27 +1,189 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Bluetooth Example</title>
-  <link rel="manifest" href="/manifest.json">
-</head>
-<body>
-  <h1>Public Message Board with Bluetooth</h1>
-  <button id="connect">Connect to Bluetooth Device</button>
-  <input type="text" id="message" placeholder="Type your message">
-  <button id="post">Post Message</button>
-  <ul id="messages"></ul>
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <title>Wave</title>
+    <link rel="manifest" href="/manifest.json">
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f0f0f0;
+        margin: 0;
+        padding: 20px;
+      }
+      h1 {
+        text-align: center;
+        color: #333;
+      }
+      #connect, #post {
+        background-color: #fff785;
+        color: rgb(0, 0, 0);
+        border: none;
+        padding: 10px 20px;
+        cursor: pointer;
+        margin: 5px;
+        border-radius: 5px;
+      }
+      #connect:hover, #post:hover {
+        background-color: #cdcd05;
+      }
+      #message {
+        width: calc(100% - 120px);
+        padding: 10px;
+        margin: 15px;
+        border-radius: 5px;
+        border: 1px solid #e8e8e8;
+        flex-grow: 1;
+      }
+      #messages {
+        list-style-type: none;
+        padding: 0;
+      }
+      #messages li {
+        background-color: white;
+        margin: 15px 0;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 0 10px rgba(102, 102, 102, 0.1);
+      }
+      .container {
+        max-width: 600px;
+        margin: auto;
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+      }
+      .input-container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+      }
 
-  <script src="https://cdn.jsdelivr.net/npm/localforage/dist/localforage.min.js"></script>
-  <script src="/script.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js')
-        .then(registration => {
-          console.log('Service Worker registered with scope:', registration.scope);
-        }).catch(error => {
-          console.log('Service Worker registration failed:', error);
+      @media (max-width: 600px) {
+        .container {
+          padding: 15px;
+        }
+        #message {
+          width: 100%;
+          margin: 10px 0;
+        }
+        #connect, #post {
+          width: 100%;
+          margin: 10px 0;
+          padding: 15px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Wave Public Channel</h1>
+      <button id="connect">Connect to Bluetooth Device</button>
+      <div class="input-container">
+        <input type="text" id="message" placeholder="Type your message">
+        <button id="post">Post Message</button>
+      </div>
+      <ul id="messages"></ul>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/localforage/dist/localforage.min.js"></script>
+    <script src="/script.js"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/service-worker.js')
+          .then(registration => {
+            console.log('Service Worker registered with scope:', registration.scope);
+          }).catch(error => {
+            console.log('Service Worker registration failed:', error);
+          });
+      }
+
+      document.getElementById('post').addEventListener('click', async () => {
+        const message = document.getElementById('message').value;
+
+        // Save message to local storage
+        saveMessageToLocal(message);
+
+        const response = await fetch('/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ message })
         });
-    }
-  </script>
-</body>
-</html>
+
+        if (response.ok) {
+          loadMessages();
+          document.getElementById('message').value = '';
+        } else {
+          console.error('Failed to post message:', response.statusText);
+        }
+      });
+
+      async function connectBluetooth() {
+        if (!navigator.bluetooth) {
+          console.error('Web Bluetooth API is not available in this browser.');
+          return;
+        }
+
+        try {
+          console.log('Requesting Bluetooth Device...');
+
+          const device = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: ['generic_access', 'generic_attribute']
+          });
+
+          console.log('Device selected:', device);
+
+          const server = await device.gatt.connect();
+          console.log('Connected to GATT Server:', server);
+
+          const services = await server.getPrimaryServices();
+          console.log('Available services:', services);
+
+          for (const service of services) {
+            console.log(`Service: ${service.uuid}`);
+            const characteristics = await service.getCharacteristics();
+            characteristics.forEach(characteristic => {
+              console.log(`Characteristic: ${characteristic.uuid}`);
+            });
+          }
+        } catch (error) {
+          console.error('Error:', error);
+        }
+      }
+
+      async function loadMessages() {
+        const response = await fetch('/messages');
+        const messages = await response.json();
+        displayMessages(messages);
+      }
+
+      function displayMessages(messages) {
+        const messagesList = document.getElementById('messages');
+        messagesList.innerHTML = '';
+        messages.forEach(message => {
+          const li = document.createElement('li');
+          li.textContent = message;
+          messagesList.appendChild(li);
+        });
+      }
+
+      function saveMessageToLocal(message) {
+        let messages = JSON.parse(localStorage.getItem('messages')) || [];
+        messages.push(message);
+        localStorage.setItem('messages', JSON.stringify(messages));
+        displayMessages(messages);
+      }
+
+      window.addEventListener('load', () => {
+        const messages = JSON.parse(localStorage.getItem('messages')) || [];
+        displayMessages(messages);
+        connectBluetooth();
+      });
+    </script>
+
+  </body>
+  </html>
